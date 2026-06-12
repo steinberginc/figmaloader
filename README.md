@@ -31,32 +31,21 @@ Check whether Figma is detected and patched:
 npm run status
 ```
 
-### Recommended macOS Install
+### macOS
 
-Recent macOS versions may block writes inside the root-owned `/Applications/Figma.app` bundle even when a command is run with `sudo`. The easiest route is to patch a user-owned copy:
-
-```bash
-mkdir -p "$HOME/Applications"
-ditto /Applications/Figma.app "$HOME/Applications/Figma Blue Loader.app"
-node desktop/patch-figma-loader.js patch --app "$HOME/Applications/Figma Blue Loader.app"
-open "$HOME/Applications/Figma Blue Loader.app"
-```
-
-To restore the copied app:
-
-```bash
-node desktop/patch-figma-loader.js restore --app "$HOME/Applications/Figma Blue Loader.app"
-```
-
-Or remove the copied app and keep using the original Figma app.
-
-### Patch In Place
-
-If your system allows modifying the installed app bundle, patch with the default blue loader:
+Patch the installed app with the default blue loader:
 
 ```bash
 sudo node desktop/patch-figma-loader.js patch
 ```
+
+The script first tries to store backups next to Figma's `app.asar`. If macOS blocks that, it falls back to:
+
+```text
+~/Library/Application Support/FigmaLoader/backups
+```
+
+If macOS blocks the final app update with `EPERM` or `Operation not permitted`, allow Terminal in **System Settings -> Privacy & Security -> App Management**. If that is not available on your macOS version, grant Terminal **Full Disk Access**, restart Terminal, and rerun the patch command.
 
 Patch with a neutral gray loader:
 
@@ -71,6 +60,16 @@ sudo node desktop/patch-figma-loader.js restore
 ```
 
 Close Figma before running `patch` or `restore`.
+
+### macOS Copied App
+
+You can also patch a copied app bundle, but Figma's single-instance behavior may still redirect launches back to the installed `/Applications/Figma.app`.
+
+```bash
+mkdir -p "$HOME/Applications"
+ditto /Applications/Figma.app "$HOME/Applications/Figma Blue Loader.app"
+node desktop/patch-figma-loader.js patch --app "$HOME/Applications/Figma Blue Loader.app"
+```
 
 ### Windows
 

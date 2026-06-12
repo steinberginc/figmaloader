@@ -134,6 +134,28 @@ function getAppRoot(asarPath) {
   return resourcesDir;
 }
 
+function getBackupRoot() {
+  if (process.env.FIGMA_LOADER_BACKUP_DIR) {
+    return path.resolve(process.env.FIGMA_LOADER_BACKUP_DIR);
+  }
+
+  const sudoUserHome =
+    process.env.SUDO_USER && process.env.SUDO_USER !== "root"
+      ? path.join("/Users", process.env.SUDO_USER)
+      : "";
+  const userHome = sudoUserHome && fs.existsSync(sudoUserHome) ? sudoUserHome : os.homedir();
+
+  if (process.platform === "win32") {
+    return path.join(
+      process.env.LOCALAPPDATA || userHome,
+      "FigmaLoader",
+      "backups"
+    );
+  }
+
+  return path.join(userHome, "Library", "Application Support", "FigmaLoader", "backups");
+}
+
 function getPaths(appPath) {
   const asarPath = resolveAsarPath(appPath);
   const resourcesDir = path.dirname(asarPath);
@@ -142,15 +164,19 @@ function getPaths(appPath) {
     path.basename(resourcesDir) === "Resources" && path.basename(path.dirname(resourcesDir)) === "Contents"
       ? path.dirname(resourcesDir)
       : "";
+  const backupSlug = crypto.createHash("sha1").update(asarPath).digest("hex").slice(0, 12);
+  const backupRoot = getBackupRoot();
 
   return {
     appPath: appRoot,
     asarPath,
     asarBackupPath: path.join(resourcesDir, "app.asar.figma-blue-loader.backup"),
+    externalAsarBackupPath: path.join(backupRoot, `${backupSlug}-app.asar.backup`),
     codeResourcesPath: contentsDir ? path.join(contentsDir, "_CodeSignature", "CodeResources") : "",
     codeResourcesBackupPath: contentsDir
       ? path.join(contentsDir, "_CodeSignature", "CodeResources.figma-blue-loader.backup")
       : "",
+    externalCodeResourcesBackupPath: path.join(backupRoot, `${backupSlug}-CodeResources.backup`),
     infoPlistPath: contentsDir ? path.join(contentsDir, "Info.plist") : ""
   };
 }
@@ -212,15 +238,66 @@ function isPatched(paths) {
   return extractLoadingScreen(paths).includes(PATCH_MARKER);
 }
 
-function backupOriginals(paths) {
-  if (!fs.existsSync(paths.asarBackupPath)) {
-    fs.copyFileSync(paths.asarPath, paths.asarBackupPath);
-    console.log(`Backed up app.asar to ${paths.asarBackupPath}`);
+function copyFileWithFallback(sourcePath, preferredPath, fallbackPath, label) {
+  if (preferredPath && fs.existsSync(preferredPath)) {
+    return preferredPath;
   }
 
-  if (fs.existsSync(paths.codeResourcesPath) && !fs.existsSync(paths.codeResourcesBackupPath)) {
-    fs.copyFileSync(paths.codeResourcesPath, paths.codeResourcesBackupPath);
-    console.log(`Backed up CodeResources to ${paths.codeResourcesBackupPath}`);
+  if (fallbackPath && fs.existsSync(fallbackPath)) {
+    return fallbackPath;
+  }
+
+  if (preferredPath) {
+    try {
+      fs.copyFileSync(sourcePath, preferredPath);
+      console.log(`Backed up ${label} to ${preferredPath}`);
+      return preferredPath;
+    } catch (error) {
+      if (!["EACCES", "EPERM", "EROFS"].includes(error.code)) {
+        throw error;
+      }
+
+      console.log(`Could not back up ${label} inside the app bundle (${error.code}); using user backup folder.`);
+    }
+  }
+
+  if (!fallbackPath) {
+    throw new Error(`No fallback backup path configured for ${label}`);
+  }
+
+  fs.mkdirSync(path.dirname(fallbackPath), { recursive: true });
+  fs.copyFileSync(sourcePath, fallbackPath);
+  console.log(`Backed up ${label} to ${fallbackPath}`);
+  return fallbackPath;
+}
+
+function findBackupPath(preferredPath, fallbackPath) {
+  if (preferredPath && fs.existsSync(preferredPath)) {
+    return preferredPath;
+  }
+
+  if (fallbackPath && fs.existsSync(fallbackPath)) {
+    return fallbackPath;
+  }
+
+  return "";
+}
+
+function backupOriginals(paths) {
+  copyFileWithFallback(
+    paths.asarPath,
+    paths.asarBackupPath,
+    paths.externalAsarBackupPath,
+    "app.asar"
+  );
+
+  if (fs.existsSync(paths.codeResourcesPath)) {
+    copyFileWithFallback(
+      paths.codeResourcesPath,
+      paths.codeResourcesBackupPath,
+      paths.externalCodeResourcesBackupPath,
+      "CodeResources"
+    );
   }
 }
 
@@ -472,16 +549,23 @@ function patch(paths, color, skipSign) {
 
 function restore(paths, skipSign) {
   assertFigmaApp(paths);
+  const asarBackupPath = findBackupPath(paths.asarBackupPath, paths.externalAsarBackupPath);
+  const codeResourcesBackupPath = findBackupPath(
+    paths.codeResourcesBackupPath,
+    paths.externalCodeResourcesBackupPath
+  );
 
-  if (!fs.existsSync(paths.asarBackupPath)) {
-    throw new Error(`No backup found at ${paths.asarBackupPath}`);
+  if (!asarBackupPath) {
+    throw new Error(
+      `No backup found at ${paths.asarBackupPath} or ${paths.externalAsarBackupPath}`
+    );
   }
 
-  fs.copyFileSync(paths.asarBackupPath, paths.asarPath);
+  fs.copyFileSync(asarBackupPath, paths.asarPath);
   console.log("Restored original app.asar backup.");
 
-  if (fs.existsSync(paths.codeResourcesBackupPath)) {
-    fs.copyFileSync(paths.codeResourcesBackupPath, paths.codeResourcesPath);
+  if (codeResourcesBackupPath && paths.codeResourcesPath) {
+    fs.copyFileSync(codeResourcesBackupPath, paths.codeResourcesPath);
     console.log("Restored original CodeResources backup.");
   } else {
     signApp(paths, skipSign);
@@ -493,7 +577,7 @@ function status(paths) {
 
   console.log(`Figma app: ${paths.appPath}`);
   console.log(`app.asar: ${paths.asarPath}`);
-  console.log(`Backup: ${fs.existsSync(paths.asarBackupPath) ? "yes" : "no"}`);
+  console.log(`Backup: ${findBackupPath(paths.asarBackupPath, paths.externalAsarBackupPath) ? "yes" : "no"}`);
   console.log(`Patched: ${isPatched(paths) ? "yes" : "no"}`);
 
   if (process.platform === "darwin" && path.extname(paths.appPath) === ".app") {
