@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Figma Blue Loader</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <h1>Loader style</h1>
+
+      <label class="option">
+        <input type="radio" name="mode" value="blue">
+        <span class="swatch blue"></span>
+        <span>Figma blue</span>
+      </label>
+
+      <label class="option">
+        <input type="radio" name="mode" value="neutral">
+        <span class="swatch neutral"></span>
+        <span>Neutral gray</span>
+      </label>
+
+      <label class="option custom-option">
+        <input type="radio" name="mode" value="custom">
+        <span class="swatch custom" id="customSwatch"></span>
+        <span>Custom</span>
+      </label>
+
+      <label class="custom-color">
+        <span>Color</span>
+        <input type="color" id="customColor" value="#0d99ff">
+      </label>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

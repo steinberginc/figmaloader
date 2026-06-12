@@ -1,0 +1,26 @@
+:root {
+  --figma-loader-replacement: #0d99ff;
+}
+
+[class^="loader--"],
+[class*=" loader--"],
+[class^="loading--"],
+[class*=" loading--"],
+[class^="progress_bar--"],
+[class*=" progress_bar--"],
+[class^="progressBar--"],
+[class*=" progressBar--"],
+[class*="rainbow"],
+[class*="Rainbow"],
+[role="progressbar"] {
+  accent-color: var(--figma-loader-replacement) !important;
+}
+
+[data-figma-loader-replacement="true"],
+[data-figma-loader-replacement="true"]::before,
+[data-figma-loader-replacement="true"]::after {
+  background: var(--figma-loader-replacement) !important;
+  background-color: var(--figma-loader-replacement) !important;
+  background-image: none !important;
+  border-color: var(--figma-loader-replacement) !important;
+}

@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Figma Blue Loader",
+  "description": "Replaces Figma's rainbow loading bar with a generic blue or neutral loader.",
+  "version": "1.0.0",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": ["https://www.figma.com/*", "https://figma.com/*"],
+      "css": ["src/loader.css"],
+      "js": ["src/content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_title": "Figma Blue Loader",
+    "default_popup": "src/popup.html"
+  }
+}
