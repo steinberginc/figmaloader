@@ -31,7 +31,28 @@ Check whether Figma is detected and patched:
 npm run status
 ```
 
-Patch with the default blue loader:
+### Recommended macOS Install
+
+Recent macOS versions may block writes inside the root-owned `/Applications/Figma.app` bundle even when a command is run with `sudo`. The easiest route is to patch a user-owned copy:
+
+```bash
+mkdir -p "$HOME/Applications"
+ditto /Applications/Figma.app "$HOME/Applications/Figma Blue Loader.app"
+node desktop/patch-figma-loader.js patch --app "$HOME/Applications/Figma Blue Loader.app"
+open "$HOME/Applications/Figma Blue Loader.app"
+```
+
+To restore the copied app:
+
+```bash
+node desktop/patch-figma-loader.js restore --app "$HOME/Applications/Figma Blue Loader.app"
+```
+
+Or remove the copied app and keep using the original Figma app.
+
+### Patch In Place
+
+If your system allows modifying the installed app bundle, patch with the default blue loader:
 
 ```bash
 sudo node desktop/patch-figma-loader.js patch
